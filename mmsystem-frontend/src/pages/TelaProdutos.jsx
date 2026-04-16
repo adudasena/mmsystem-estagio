@@ -2,62 +2,71 @@ import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 
 const TelaProdutos = () => {
-  const [editandoId, setEditandoId] = useState(null); // Estado para saber se estamos editando
+  const [editandoId, setEditandoId] = useState(null);
+  const [listaProdutos, setListaProdutos] = useState([]);
   const [produto, setProduto] = useState({
     nome: '', categoria: '', descricao: '', preco: '',
     tamanhosSelecionados: [], coresSelecionadas: [], estoqueDetalhado: {},
-    foto: null // Campo para o arquivo da foto
+    fotos: [] 
   });
 
   const tamanhos = ['PP', 'P', 'M', 'G', 'GG', 'G1', 'G2'];
+  const categorias = ['Blusas', 'Vestidos', 'Saias', 'Camisas', 'Calças', 'Shorts'];
   const listaCores = [
-    { nome: 'Vermelho', cor: 'bg-red-600' }, { nome: 'Amarelo', cor: 'bg-yellow-400' },
-    { nome: 'Verde', cor: 'bg-green-600' }, { nome: 'Branco', cor: 'bg-white border border-gray-300' },
-    { nome: 'Azul', cor: 'bg-blue-600' }, { nome: 'Preto', cor: 'bg-black' },
-    { nome: 'Laranja', cor: 'bg-orange-500' }, { nome: 'Rosa', cor: 'bg-pink-400' },
-    { nome: 'Roxo', cor: 'bg-purple-600' },
+    { nome: 'Vermelho', hex: '#e11d48' }, { nome: 'Amarelo', hex: '#facc15' },
+    { nome: 'Laranja', hex: '#ea580c' }, { nome: 'Verde', hex: '#16a34a' }, 
+    { nome: 'Branco', hex: '#ffffff' }, { nome: 'Rosa', hex: '#f472b6' },
+    { nome: 'Azul', hex: '#2563eb' }, { nome: 'Preto', hex: '#000000' }, 
+    { nome: 'Roxo', hex: '#9333ea' },
   ];
 
-  const aoMudarValor = (e) => {
-    const { name, value } = e.target;
-    setProduto({ ...produto, [name]: value });
+  const buscarProdutos = async () => {
+    try {
+      const resposta = await api.get('/produtos');
+      setListaProdutos(resposta.data);
+    } catch (erro) { console.error("Erro ao buscar:", erro); }
   };
 
-  // --- LÓGICA DE FOTO ---
-  const handleFoto = (e) => {
-    if (e.target.files && e.target.files) {
-      setProduto({ ...produto, foto: e.target.files });
-      alert("Foto selecionada com sucesso!");
+  useEffect(() => { buscarProdutos(); }, []);
+
+  const handleFotos = (e) => {
+    const arquivos = Array.from(e.target.files);
+    arquivos.forEach(arquivo => {
+      const reader = new FileReader();
+      reader.readAsDataURL(arquivo);
+      reader.onloadend = () => {
+        setProduto(prev => ({
+          ...prev,
+          fotos: [...prev.fotos, reader.result].slice(0, 4)
+        }));
+      };
+    });
+  };
+
+  const prepararEdicao = (p) => {
+  setEditandoId(p.id);
+
+  // Função para converter o que vem do banco (String) de volta para Array/Objeto
+  const parseSeguro = (dado, tipo) => {
+    try {
+      return dado ? JSON.parse(dado) : tipo;
+    } catch (e) {
+      return tipo;
     }
   };
 
-  // --- LÓGICA DE EDIÇÃO (O QUE ESTAVA FALTANDO) ---
-  const prepararEdicao = (item) => {
-    setEditandoId(item.id);
-    setProduto({
-      nome: item.nome,
-      categoria: item.categoria,
-      descricao: item.descricao,
-      preco: item.preco,
-      tamanhosSelecionados: item.tamanhosSelecionados || [],
-      coresSelecionadas: item.coresSelecionadas || [],
-      estoqueDetalhado: item.estoqueDetalhado || {}
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' }); // Sobe a tela para editar
-  };
-
-  const toggleTamanho = (t) => {
-    const novos = produto.tamanhosSelecionados.includes(t)
-      ? produto.tamanhosSelecionados.filter(item => item !== t)
-      : [...produto.tamanhosSelecionados, t];
-    setProduto({ ...produto, tamanhosSelecionados: novos });
-  };
-
-  const handleCheckboxCor = (nomeCor) => {
-    const novasCores = produto.coresSelecionadas.includes(nomeCor)
-      ? produto.coresSelecionadas.filter(c => c !== nomeCor)
-      : [...produto.coresSelecionadas, nomeCor];
-    setProduto({ ...produto, coresSelecionadas: novasCores });
+  setProduto({
+    nome: p.nome || '',
+    categoria: p.categoria || '',
+    descricao: p.descricao || '',
+    preco: p.preco || '',
+    tamanhosSelecionados: parseSeguro(p.tamanhosSelecionados, []),
+    coresSelecionadas: parseSeguro(p.coresSelecionadas, []),
+    estoqueDetalhado: parseSeguro(p.estoqueDetalhado, {}),
+    fotos: parseSeguro(p.fotos, [])
+  });
+  
+  window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const abrirGestaoEstoque = () => {
@@ -65,7 +74,9 @@ const TelaProdutos = () => {
       alert("Selecione as cores e tamanhos primeiro!");
       return;
     }
+    alert("MM System: Abrindo lançador de estoque por variação...");
     let novoEstoque = { ...produto.estoqueDetalhado };
+    
     produto.coresSelecionadas.forEach(cor => {
       produto.tamanhosSelecionados.forEach(tam => {
         const chave = `${cor}-${tam}`;
@@ -77,157 +88,274 @@ const TelaProdutos = () => {
   };
 
   const salvarProduto = async () => {
-    try {
-      // Se tiver foto, o ideal é usar FormData para enviar o arquivo ao Java
-      if (editandoId) {
-        await api.put(`/produtos/${editandoId}`, produto);
-        alert('Produto atualizado na Maria Morena!');
-      } else {
-        await api.post('/produtos', produto);
-        alert('Produto salvo com sucesso!');
-      }
-      resetarForm();
-      buscarProdutos();
-    } catch (erro) { alert('Erro ao processar produto.'); }
-  };
+  if (!produto.nome || !produto.preco) return alert("Preencha o nome e o preço!");
 
-  const [listaProdutos, setListaProdutos] = useState([]);
-  const buscarProdutos = async () => {
-    try {
-      const resposta = await api.get('/produtos');
-      setListaProdutos(resposta.data);
-    } catch (erro) { console.error(erro); }
-  };
-
-  useEffect(() => { buscarProdutos(); }, []);
-
-  const excluirProduto = async (id) => {
-    if(window.confirm("Deseja excluir da base da Maria Morena?")) {
-      await api.delete(`/produtos/${id}`);
-      buscarProdutos(); 
+  try {
+    // Envia o objeto 'produto' que já contém os arrays/objetos
+    // O Java DTO vai receber isso e o Controller vai converter para String
+    if (editandoId) {
+      await api.put(`/produtos/${editandoId}`, produto);
+    } else {
+      await api.post('/produtos', produto);
     }
-  };
+
+    alert('Produto salvo com sucesso!');
+    resetarForm();
+    buscarProdutos(); // Recarrega a lista
+  } catch (erro) {
+    console.error("Erro detalhado:", erro.response?.data || erro.message);
+    alert('Erro ao salvar!');
+  }
+};
+
+const deletarProduto = async (id) => {
+  // A mensagem de confirmação de exclusão
+  const certeza = window.confirm("⚠️ MM System: Tem certeza que deseja excluir este produto? Esta ação não pode ser desfeita.");
+  
+  if (certeza) {
+    try {
+      await api.delete(`/produtos/${id}`);
+      alert("Produto removido com sucesso!");
+      buscarProdutos(); // Atualiza a lista automaticamente
+    } catch (erro) {
+      console.error("Erro ao excluir:", erro);
+      alert("Erro ao excluir o produto. Verifique o console.");
+    }
+  }
+};
 
   const resetarForm = () => {
     setEditandoId(null);
-    setProduto({ nome:'', categoria:'', descricao:'', preco:'', tamanhosSelecionados:[], coresSelecionadas:[], estoqueDetalhado:{}, foto: null });
+    setProduto({ nome:'', categoria:'', descricao:'', preco:'', tamanhosSelecionados:[], coresSelecionadas:[], estoqueDetalhado:{}, fotos: [] });
   };
 
+const verDetalhes = (p) => {
+  const parseJSON = (dado) => {
+    try { return typeof dado === 'string' ? JSON.parse(dado) : dado; }
+    catch { return {}; }
+  };
+
+  const estoque = parseJSON(p.estoqueDetalhado);
+  const cores = parseJSON(p.coresSelecionadas);
+  const tamanhos = parseJSON(p.tamanhosSelecionados);
+
+  // String de detalhes formatada para exibir as informações do produto
+  const mensagem = `
+    ✨ PRODUTO: ${p.nome.toUpperCase()} ✨
+    ---------------------------------
+    📂 Categoria: ${p.categoria}
+    💰 Preço: R$ ${p.preco}
+    🎨 Cores: ${Array.isArray(cores) ? cores.join(', ') : 'Padrão'}
+    📏 Tamanhos: ${Array.isArray(tamanhos) ? tamanhos.join(', ') : 'Único'}
+    
+    📦 ESTOQUE DETALHADO:
+    ${Object.entries(estoque).map(([k, v]) => `   • ${k}: ${v} unidades`).join('\n')}
+    ---------------------------------
+    ID do Registro: ${p.id}
+  `;
+
+  alert(mensagem);
+};
+
   return (
-    <div className="max-w-6xl mx-auto">
-      <header className="mb-8">
-        <h2 className="text-3xl font-semibold text-gray-800 italic">
-          {editandoId ? 'Editando produto' : 'Novo/Editar produto'}
+    <div className="flex-1 p-10 bg-[#d9d9ce] min-h-screen font-sans text-gray-800">
+      <header className="mb-6">
+        <h2 className="text-3xl font-serif italic text-gray-700">
+          {editandoId ? 'Editando Produto' : 'Novo/Editar Produto'}
         </h2>
       </header>
 
-      <div className="grid grid-cols-12 gap-8">
-        <div className="col-span-7 space-y-6">
-          <section className="bg-white p-6 rounded shadow-md border-b-4 border-gray-300">
-            <label className="block font-bold mb-2 text-gray-700">Nome do produto</label>
-            <input name="nome" value={produto.nome} onChange={aoMudarValor} className="w-full border p-2 rounded bg-[#f9f9f7] focus:outline-[#4a5d33]" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div className="lg:col-span-2 space-y-6">
+          {/* INFORMAÇÕES BÁSICAS */}
+          <div className="bg-white p-6 rounded-sm shadow-sm border border-gray-100">
+            <label className="block text-[11px] font-bold uppercase mb-2 text-gray-500">Nome do produto</label>
+            <input value={produto.nome} onChange={e => setProduto({...produto, nome: e.target.value})} className="w-full border p-2 bg-gray-50 outline-none" />
             
-            <label className="block font-bold mt-4 mb-2 text-gray-700">Categoria</label>
-            <select name="categoria" value={produto.categoria} onChange={aoMudarValor} className="w-full border p-2 rounded bg-[#f9f9f7]">
+            <label className="block text-[11px] font-bold uppercase mt-4 mb-2 text-gray-500">Categoria</label>
+            <select value={produto.categoria} onChange={e => setProduto({...produto, categoria: e.target.value})} className="w-full border p-2 bg-gray-50 outline-none">
               <option value="">Selecione...</option>
-              <option value="Blusas">Blusas</option>
-              <option value="Vestidos">Vestidos</option>
+              {categorias.map(cat => <option key={cat} value={cat}>{cat}</option>)}
             </select>
 
-            <label className="block font-bold mt-4 mb-2 text-gray-700">Descrição curta</label>
-            <textarea name="descricao" value={produto.descricao} onChange={aoMudarValor} className="w-full border p-2 rounded bg-[#f9f9f7] h-32 focus:outline-[#4a5d33]" />
-          </section>
+            <label className="block text-[11px] font-bold uppercase mt-4 mb-2 text-gray-500">Descrição curta</label>
+            <textarea value={produto.descricao} onChange={e => setProduto({...produto, descricao: e.target.value})} className="w-full border p-2 h-32 bg-gray-50 outline-none resize-none" />
+          </div>
 
-          <section className="bg-white p-6 rounded shadow-md border-b-4 border-gray-300">
-            <label className="block font-bold mb-4 text-gray-700">Fotos do produto</label>
-            <div className="grid grid-cols-4 gap-4">
-              <label className="border-2 border-dashed border-gray-300 rounded-lg h-28 flex flex-col items-center justify-center cursor-pointer hover:border-[#4a5d33] transition-all relative overflow-hidden">
-                {produto.foto ? <span className="text-[10px] text-green-600 font-bold text-center px-1">{produto.foto.name}</span> : (
-                  <>
-                    <span className="text-2xl">📸</span>
-                    <span className="text-[10px] uppercase font-bold text-gray-500 mt-1">Adicionar</span>
-                  </>
-                )}
-                <input type="file" onChange={handleFoto} className="hidden" />
+          {/* FOTOS */}
+          <div className="bg-white p-6 rounded-sm shadow-sm border border-gray-100">
+            <label className="block text-[11px] font-bold uppercase mb-4 text-gray-500">Fotos do produto</label>
+            <div className="flex gap-4 overflow-x-auto pb-2">
+              <label className="min-w-[100px] h-[100px] border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-50 rounded">
+                <span className="text-xl">📸</span>
+                <span className="text-[8px] font-bold uppercase">ADICIONAR</span>
+                <input type="file" multiple onChange={handleFotos} className="hidden" />
               </label>
-              <div className="bg-gray-50 border rounded-lg h-28 flex items-center justify-center text-gray-300 text-xs italic">Sem imagem</div>
-              <div className="bg-gray-50 border rounded-lg h-28 flex items-center justify-center text-gray-300 text-xs italic">Sem imagem</div>
-              <div className="bg-gray-50 border rounded-lg h-28 flex items-center justify-center text-gray-300 text-xs italic">Sem imagem</div>
-            </div>
-          </section>
-        </div>
-
-        <div className="col-span-5 space-y-6">
-          <section className="bg-white p-6 rounded shadow-md border-b-4 border-gray-300">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block font-bold mb-2 text-gray-700">Preço</label>
-                <input name="preco" value={produto.preco} onChange={aoMudarValor} type="number" className="w-full border p-2 rounded bg-[#f9f9f7]" />
-              </div>
-              <div onClick={abrirGestaoEstoque} className="cursor-pointer">
-                <label className="block font-bold mb-2 text-gray-700">Estoque ⚙️</label>
-                <input readOnly value={Object.values(produto.estoqueDetalhado).reduce((a, b) => a + b, 0)} className="w-full border p-2 rounded bg-gray-100 cursor-pointer font-bold text-center" />
-              </div>
-            </div>
-          </section>
-
-          <section className="bg-white p-6 rounded shadow-md border-b-4 border-gray-300">
-            <label className="block font-bold mb-4 text-gray-700">Tamanhos Disponíveis</label>
-            <div className="flex flex-wrap gap-2">
-              {tamanhos.map(t => (
-                <button key={t} type="button" onClick={() => toggleTamanho(t)} className={`border-2 px-3 py-1 font-bold transition-all text-sm ${produto.tamanhosSelecionados.includes(t) ? 'bg-black text-white border-black' : 'border-gray-800'}`}>
-                  {t}
-                </button>
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="min-w-[100px] h-[100px] border bg-gray-50 rounded flex items-center justify-center relative overflow-hidden">
+                  {produto.fotos[i] ? (
+                    <img src={produto.fotos[i]} className="w-full h-full object-cover" alt="preview" />
+                  ) : (
+                    <span className="text-[9px] italic text-gray-300 font-serif">MM System</span>
+                  )}
+                </div>
               ))}
             </div>
-          </section>
+          </div>
+        </div>
 
-          <section className="bg-white p-6 rounded shadow-md border-b-4 border-gray-300">
-            <label className="block font-bold mb-4 text-gray-700">Cores Disponíveis</label>
+        <div className="space-y-6">
+          {/* PREÇO E ESTOQUE */}
+          <div className="bg-white p-6 rounded-sm shadow-sm border border-gray-100 grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[11px] font-bold uppercase mb-2 text-gray-500">Preço</label>
+              <input value={produto.preco} onChange={e => setProduto({...produto, preco: e.target.value})} placeholder="R$" className="w-full border p-2 bg-gray-50 outline-none" />
+            </div>
+            <div onClick={abrirGestaoEstoque} className="cursor-pointer">
+              <label className="block text-[11px] font-bold uppercase mb-2 text-gray-500">Estoque ⚙️</label>
+              <div className="w-full border p-2 bg-gray-100 font-bold text-center text-[#4a5d33]">
+                {Object.values(produto.estoqueDetalhado).reduce((a, b) => a + b, 0)}
+              </div>
+            </div>
+          </div>
+
+          {/* TAMANHOS */}
+          <div className="bg-white p-6 rounded-sm shadow-sm border border-gray-100">
+            <label className="block text-[11px] font-bold uppercase mb-4 text-center text-gray-500">Tamanhos Disponíveis</label>
+            <div className="flex flex-wrap gap-2 justify-center">
+              {tamanhos.map(t => (
+                <button key={t} onClick={() => {
+                  const novos = produto.tamanhosSelecionados.includes(t) ? produto.tamanhosSelecionados.filter(x => x !== t) : [...produto.tamanhosSelecionados, t];
+                  setProduto({...produto, tamanhosSelecionados: novos});
+                }} className={`w-9 h-9 text-[10px] font-bold border transition-all ${produto.tamanhosSelecionados.includes(t) ? 'bg-black text-white' : 'bg-white text-gray-400'}`}>{t}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* CORES */}
+          <div className="bg-white p-6 rounded-sm shadow-sm border border-gray-100">
+            <label className="block text-[11px] font-bold uppercase mb-4 text-gray-500">Cores Disponíveis</label>
             <div className="grid grid-cols-2 gap-y-3">
               {listaCores.map(c => (
-                <label key={c.nome} className="flex items-center gap-3 cursor-pointer">
-                  <input type="checkbox" className="w-4 h-4 accent-[#4a5d33]" checked={produto.coresSelecionadas.includes(c.nome)} onChange={() => handleCheckboxCor(c.nome)} />
-                  <span className={`w-5 h-5 rounded-full ${c.cor} border`}></span>
-                  <span className="text-xs font-semibold">{c.nome}</span>
+                <label key={c.nome} className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" className="w-3 h-3 accent-[#4a5d33]" checked={produto.coresSelecionadas.includes(c.nome)} onChange={() => {
+                     const novos = produto.coresSelecionadas.includes(c.nome) ? produto.coresSelecionadas.filter(x => x !== c.nome) : [...produto.coresSelecionadas, c.nome];
+                     setProduto({...produto, coresSelecionadas: novos});
+                  }}/>
+                  <div className="w-3 h-3 rounded-full border shadow-sm" style={{backgroundColor: c.hex}}></div>
+                  <span className="text-[10px] text-gray-600 font-semibold">{c.nome}</span>
                 </label>
               ))}
             </div>
-          </section>
+          </div>
         </div>
       </div>
 
-      <div className="mt-10 flex justify-end gap-4 pb-10">
-        <button onClick={resetarForm} className="bg-black text-white px-10 py-2 rounded font-bold uppercase text-xs tracking-widest hover:bg-gray-800 transition-all">Cancelar</button>
-        <button onClick={salvarProduto} className="bg-[#4a5d33] text-white px-10 py-2 rounded font-bold uppercase text-xs tracking-widest shadow-lg">
+      <div className="flex justify-end gap-4 mb-12">
+        <button onClick={resetarForm} className="px-10 py-2 bg-black text-white text-[11px] font-bold uppercase rounded-sm hover:opacity-80">Cancelar</button>
+        <button onClick={salvarProduto} className="px-12 py-2 bg-[#4a5d33] text-white text-[11px] font-bold uppercase rounded-sm shadow-md hover:brightness-110">
           {editandoId ? 'Atualizar Produto' : 'Salvar Produto'}
         </button>
       </div>
 
-      <section className="mt-12 bg-white p-6 rounded shadow-md border-t-4 border-[#4a5d33] mb-20">
-        <h3 className="text-xl font-bold mb-6 text-gray-800">Produtos Cadastrados</h3>
-        <table className="w-full text-left">
-          <thead>
-            <tr className="border-b-2 border-gray-100 text-gray-400 text-xs uppercase tracking-wider">
-              <th className="pb-3 px-2">Produto</th>
-              <th className="pb-3 px-2">Preço</th>
-              <th className="pb-3 px-2 text-right">Ações</th>
-            </tr>
-          </thead>
-          <tbody className="text-sm">
-            {listaProdutos.map((item) => (
-              <tr key={item.id} className="border-b border-gray-50 hover:bg-gray-50">
-                <td className="py-4 px-2 font-semibold text-gray-700">{item.nome}</td>
-                <td className="py-4 px-2 text-gray-700">R$ {item.preco}</td>
-                <td className="py-4 px-2 text-right space-x-3">
-                  <button onClick={() => prepararEdicao(item)} className="text-blue-600 font-bold hover:underline">Editar</button>
-                  <button onClick={() => excluirProduto(item.id)} className="text-red-500 font-bold hover:underline">Excluir</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
+      {/* GESTÃO DE ITENS */}
+<section className="bg-white rounded-sm shadow-sm overflow-hidden border-t-4 border-[#4a5d33]">
+  <div className="p-4 bg-gray-50 border-b">
+    <h3 className="text-xs font-bold text-gray-700 uppercase tracking-widest">Produtos Cadastrados</h3>
+  </div>
+  <table className="w-full text-left">
+    <thead className="bg-gray-50 text-[10px] uppercase text-gray-400 border-b">
+      <tr>
+        <th className="p-4">Foto</th>
+        <th className="p-4">Produto</th>
+        <th className="p-4">Preço</th>
+        <th className="p-4">Estoque Total</th>
+        <th className="p-4 text-right">Ações</th>
+      </tr>
+    </thead>
+    <tbody className="divide-y divide-gray-100 text-sm">
+      {listaProdutos.map(p => (
+        <tr key={p.id} className="hover:bg-gray-50/50">
+          {/* CÉLULA DA FOTO */}
+          <td className="p-4">
+            {(() => {
+              try {
+                const fotosData = typeof p.fotos === 'string' ? JSON.parse(p.fotos) : p.fotos;
+                const fotoExibir = Array.isArray(fotosData) ? fotosData : fotosData;
+                const finalSrc = fotoExibir || 'https://via.placeholder.com/40';
+                return <img src={finalSrc} className="w-10 h-10 object-cover rounded border" alt="prod" />;
+              } catch (e) {
+                return <img src={p.fotos || 'https://via.placeholder.com/40'} className="w-10 h-10 object-cover rounded border" alt="prod" />;
+              }
+            })()}
+          </td>
+
+          {/* NOME DO PRODUTO */}
+          <td className="p-4 font-bold text-gray-800">{p.nome}</td>
+
+          {/* PREÇO FORMATADO */}
+          <td className="p-4 text-gray-600 font-medium">
+            R$ {Number(p.preco || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          </td>
+
+          {/* ESTOQUE TOTAL (Foco: Retirar o 0 e mostrar total) */}
+          <td className="p-4">
+            {(() => {
+              try {
+                // Converte a string JSON do banco para objeto
+                const estoqueObj = typeof p.estoqueDetalhado === 'string' 
+                  ? JSON.parse(p.estoqueDetalhado) 
+                  : p.estoqueDetalhado;
+
+                // Soma matemática pura (evita o "0" na frente)
+                const totalCalculado = Object.values(estoqueObj || {}).reduce((acc, curr) => {
+                  return acc + Number(curr || 0);
+                }, 0);
+
+                return (
+                  <div className="flex flex-col">
+                    <span className="font-bold text-[#4a5d33]">
+                      total: {totalCalculado} un
+                    </span>
+                    <span className="text-[10px] text-gray-400 truncate max-w-[200px]">
+                      {typeof p.estoqueDetalhado === 'string' ? p.estoqueDetalhado : JSON.stringify(p.estoqueDetalhado)}
+                    </span>
+                  </div>
+                );
+              } catch (e) {
+                return <span className="text-gray-400">0 un</span>;
+              }
+            })()}
+          </td>
+
+          {/* AÇÕES */}
+          <td className="p-4 text-right space-x-3">
+  <button 
+    onClick={() => prepararEdicao(p)} 
+    className="text-blue-600 hover:underline text-xs font-bold"
+  >
+    EDITAR
+  </button>
+  
+  <button 
+    onClick={() => deletarProduto(p.id)} 
+    className="text-red-600 hover:underline text-xs font-bold"
+  >
+    EXCLUIR
+  </button>
+  
+  <button 
+    onClick={() => verDetalhes(p)} 
+    className="text-green-700 hover:underline text-xs font-bold"
+  >
+    DETALHES
+  </button>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</section>
     </div>
   );
 };

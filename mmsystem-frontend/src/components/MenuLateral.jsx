@@ -19,7 +19,6 @@ const MenuLateral = () => {
       
       {/* SEÇÃO DA LOGO OFICIAL */}
       <div className="mb-12 flex flex-col items-center">
-        {/* Se tiver a imagem da logo, use esta linha: */}
         <img src={LogoMariaMorena} alt="Maria Morena Logo" className="h-16 w-auto mb-2" />
       </div>
 

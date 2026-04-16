@@ -24,16 +24,20 @@ public class Produto {
 
     private String categoria;
 
-    // Atributos para as variações
-    private String cor;
-    private String tamanho;
-    private Integer quantidadeEstoque;
+    // TEXT para salvar as listas do React como String/JSON
+    @Column(name = "cores_selecionadas", columnDefinition = "TEXT")
+    private String coresSelecionadas;
 
-    // Status: DISPONIVEL, ESGOTADO, CONDICIONAL
+    @Column(name = "tamanhos_selecionados", columnDefinition = "TEXT")
+    private String tamanhosSelecionados;
+
+    @Column(name = "estoque_detalhado", columnDefinition = "TEXT")
+    private String estoqueDetalhado;
+
+    // Para as fotos em Base64
+    @Column(name = "fotos", columnDefinition = "TEXT")
+    private String fotos;
+
     private String status;
-
-    private String imagemUrl; // Link
 }
-
-
 
