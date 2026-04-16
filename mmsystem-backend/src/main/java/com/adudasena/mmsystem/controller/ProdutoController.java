@@ -20,7 +20,17 @@ public class ProdutoController {
     }
 
     @PostMapping
-    public Produto cadastrar (@RequestBody Produto produto) {
+    public Produto cadastrar(@RequestBody Produto produto) {
         return service.salvar(produto);
+    }
+
+    @PutMapping("/{id}")
+    public Produto editar(@PathVariable Long id, @RequestBody Produto produto) {
+        return service.editar(id, produto);
+    }
+
+    @DeleteMapping("/{id}")
+    public void excluir(@PathVariable Long id) {
+        service.excluir(id);
     }
 }
