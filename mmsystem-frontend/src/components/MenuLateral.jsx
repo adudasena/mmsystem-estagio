@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import LogoMariaMorena from '../assets/escritocompleto1linha.svg';
 
 const MenuLateral = () => {
   const location = useLocation();
@@ -8,32 +9,38 @@ const MenuLateral = () => {
     { nome: 'Painel', rota: '/', icone: '📊' },
     { nome: 'Produtos', rota: '/produtos', icone: '👗' }, 
     { nome: 'Condicionais', rota: '/condicionais', icone: '📦' },
+    { nome: 'Pagamentos Futuros', rota: '/pagamentos-futuros', icone: '💰' },
     { nome: 'Vendas', rota: '/vendas', icone: '🛒' },
     { nome: 'Clientes', rota: '/clientes', icone: '👤' },
   ];
 
   return (
-    <div className="w-72 h-screen bg-[#4a5d33] text-white flex flex-col p-6 fixed left-0 top-0 shadow-xl">
-      <div className="mb-12">
-        <h1 className="text-2xl font-serif font-bold leading-tight">MARIA MORENA</h1>
-        <p className="text-[10px] tracking-[0.2em] opacity-80 uppercase">A moda ao seu alcance</p>
+    <div className="w-72 h-screen bg-[#2c3e1c] text-white flex flex-col p-6 fixed left-0 top-0 shadow-2xl z-50">
+      
+      {/* SEÇÃO DA LOGO OFICIAL */}
+      <div className="mb-12 flex flex-col items-center">
+        {/* Se tiver a imagem da logo, use esta linha: */}
+        <img src={LogoMariaMorena} alt="Maria Morena Logo" className="h-16 w-auto mb-2" />
       </div>
 
       <nav className="flex flex-col gap-2">
-        {menus.map((item) => (
-          <Link
-            key={item.nome}
-            to={item.rota}
-            className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
-              location.pathname === item.rota 
-                ? 'bg-white/20 border-l-4 border-white shadow-md' 
-                : 'hover:bg-white/10'
-            }`}
-          >
-            <span className="text-xl">{item.icone}</span>
-            <span className="font-medium">{item.nome}</span>
-          </Link>
-        ))}
+        {menus.map((item) => {
+          const isActive = location.pathname === item.rota;
+          return (
+            <Link
+              key={item.nome}
+              to={item.rota}
+              className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
+                isActive 
+                  ? 'bg-white/15 border-l-4 border-[#dcded0] shadow-inner' // Destaque para o item ativo
+                  : 'hover:bg-white/5'
+              }`}
+            >
+              <span className={`text-xl ${isActive ? 'opacity-100' : 'opacity-60'}`}>{item.icone}</span>
+              <span className={`font-medium ${isActive ? 'text-white' : 'text-white/80'}`}>{item.nome}</span>
+            </Link>
+          );
+        })}
       </nav>
 
       <div className="mt-auto border-t border-white/20 pt-4">
